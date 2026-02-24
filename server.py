@@ -8,10 +8,14 @@ from offline_brain import OfflineRAG, logger
 
 app = FastAPI(title="Offline RAG API")
 
-# Allow requests from your Vercel frontend
+# Allow requests from your Vercel frontend and local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Change this to your Vercel domain in production (e.g., ["https://my-ui.vercel.app"])
+    allow_origins=[
+        "http://localhost:3000",
+        "https://automated-offline-filerenaming.vercel.app", # Replace with your actual Vercel URL
+        "*" 
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
