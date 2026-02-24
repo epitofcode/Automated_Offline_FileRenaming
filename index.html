@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline RAG Brain</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-8 border-b border-slate-700 pb-4">
+            <h1 class="text-3xl font-bold text-blue-400">🧠 Offline RAG Brain</h1>
+            <p class="text-slate-400">Connected to: <span id="connectionStatus" class="text-red-500">Local Backend Offline</span></p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Left: Controls -->
+            <div class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                    <h2 class="text-xl font-semibold mb-4 text-blue-300">1. Process Folder</h2>
+                    <input type="text" id="folderPath" placeholder="C:\Users\Name\Documents" 
+                           class="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-4 text-sm">
+                    <button onclick="processFolder()" id="processBtn"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition">
+                        Start Processing
+                    </button>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                    <h2 class="text-xl font-semibold mb-4 text-green-300">2. Chat with Docs</h2>
+                    <textarea id="chatQuery" placeholder="Ask a question..." 
+                              class="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-4 text-sm h-24"></textarea>
+                    <button onclick="sendChat()" id="chatBtn"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded transition">
+                        Ask Question
+                    </button>
+                    <div id="chatResponse" class="mt-4 text-sm text-slate-300 italic"></div>
+                </div>
+            </div>
+
+            <!-- Right: Live Logs -->
+            <div class="bg-black p-4 rounded-xl border border-slate-700 h-[500px] flex flex-col">
+                <h2 class="text-sm font-mono text-slate-500 mb-2 uppercase tracking-widest">Live System Logs</h2>
+                <div id="logContainer" class="flex-1 overflow-y-auto font-mono text-xs text-green-500 space-y-1 p-2">
+                    <div>> Waiting for connection to localhost:8000...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8000";
+        const WS_BASE = "ws://localhost:8000/ws/logs";
+
+        // Check connection
+        async function checkConnection() {
+            try {
+                const res = await fetch(`${API_BASE}/docs`);
+                if (res.ok) {
+                    document.getElementById('connectionStatus').innerText = "Local Backend Online";
+                    document.getElementById('connectionStatus').classList.replace('text-red-500', 'text-green-500');
+                    setupWebSocket();
+                }
+            } catch (e) {
+                setTimeout(checkConnection, 3000);
+            }
+        }
+
+        function setupWebSocket() {
+            const ws = new WebSocket(WS_BASE);
+            const logs = document.getElementById('logContainer');
+            ws.onmessage = (event) => {
+                const div = document.createElement('div');
+                div.textContent = event.data;
+                logs.appendChild(div);
+                logs.scrollTop = logs.scrollHeight;
+            };
+        }
+
+        async function processFolder() {
+            const path = document.getElementById('folderPath').value;
+            const btn = document.getElementById('processBtn');
+            btn.disabled = true;
+            btn.innerText = "Processing...";
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/process`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({folder_path: path})
+                });
+                const data = await res.json();
+                alert(data.message);
+            } catch (e) {
+                alert("Error connecting to local server. Is run_local.bat running?");
+            }
+            btn.disabled = false;
+            btn.innerText = "Start Processing";
+        }
+
+        async function sendChat() {
+            const query = document.getElementById('chatQuery').value;
+            const resBox = document.getElementById('chatResponse');
+            resBox.innerText = "Thinking...";
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: query})
+                });
+                const data = await res.json();
+                resBox.innerHTML = `<strong>AI:</strong> ${data.answer}<br><br><small>Refs: ${data.references.join(', ')}</small>`;
+            } catch (e) {
+                resBox.innerText = "Error: Local backend not responding.";
+            }
+        }
+
+        checkConnection();
+    </script>
+</body>
+</html>
