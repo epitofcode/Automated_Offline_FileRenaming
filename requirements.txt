@@ -1,0 +1,13 @@
+fastapi==0.118.0
+uvicorn==0.41.0
+python-multipart==0.0.22
+langchain
+langchain-community
+langchain-ollama
+langchain-classic
+langchain-text-splitters
+chromadb
+pypdf
+python-docx
+sentence-transformers
+unidecode
