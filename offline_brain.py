@@ -18,15 +18,16 @@ from langchain_classic.chains import RetrievalQA
 from unidecode import unidecode
 
 # --- CONFIGURATION ---
-TARGET_FOLDER = r"C:\Users\Sritej\Desktop\ayman\Computer_architecture"
+TARGET_FOLDER = r"C:\Users\Sritej\Desktop\qwerty"
 DB_FOLDER = "./local_chroma_db"             # Where the vector DB lives
 MODEL_NAME = "llama3"                       # Ensure you ran `ollama pull llama3`
 
 # --- LOGGING SETUP (Expert Practice) ---
+log_handler = logging.FileHandler("system.log", mode='w')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("system.log", mode='w'), logging.StreamHandler()]
+    handlers=[log_handler, logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 

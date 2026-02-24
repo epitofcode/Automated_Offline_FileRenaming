@@ -73,6 +73,10 @@ async def chat(request: ChatRequest):
     references = list(set([d.metadata.get('filename', 'Unknown') for d in docs]))
     return {"answer": answer, "references": references}
 
+@app.get("/api/status")
+async def get_status():
+    return {"is_processing": is_processing}
+
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
     """Streams system.log to the frontend in real-time."""
@@ -84,11 +88,12 @@ async def websocket_logs(websocket: WebSocket):
             with open(log_file, 'w') as f: pass
             
         with open(log_file, 'r', encoding='utf-8') as f:
-            # Start at the beginning of the file for the current session
+            # Seek to start of session
+            f.seek(0)
             while True:
                 line = f.readline()
                 if not line:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.2) # Faster polling
                     continue
                 await websocket.send_text(line.strip())
     except WebSocketDisconnect:
