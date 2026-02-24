@@ -57,36 +57,43 @@ class SemanticRenamer:
         self.llm = ChatOllama(model=model_name, temperature=0)
 
     def generate_filename(self, text_content: str) -> str:
-        """Reads the first 2000 chars and hallucinates a filename."""
+        """Reads the first 2000 chars and generates a descriptive Topic_Type string."""
         prompt = (
             "You are a file management assistant. Analyze the text below and generate a concise, "
-            "descriptive filename. "
-            "Format: YYYY-MM-DD_Topic_Type (e.g., 2023-05-12_Physics_Notes). "
-            "If no date is found, use 'UnknownDate'. "
-            "ONLY output the filename. Do not output extension. Do not output explanation.\n\n"
+            "descriptive topic and document type. "
+            "Format: Topic_Type (e.g., Physics_Notes, Invoice_Service, Project_Proposal). "
+            "Do not include dates. Do not include extensions. "
+            "ONLY output the Topic_Type string.\n\n"
             f"TEXT: {text_content[:2000]}"
         )
         try:
             response = self.llm.invoke(prompt)
-            # Clean up the output (remove spaces, illegal chars)
+            # Clean up the output
             clean_name = unidecode(response.content.strip()).replace(" ", "_").replace("/", "-")
+            # Remove any trailing dates the LLM might have added anyway
+            import re
+            clean_name = re.sub(r'_\d{4}-\d{2}-\d{2}', '', clean_name)
             return clean_name
         except Exception as e:
             logger.error(f"LLM Renaming failed: {e}")
             return "Unknown_Document"
 
-    def safe_rename(self, original_path: str, new_name: str) -> str:
-        """Renames file safely, handling duplicates."""
+    def safe_rename(self, original_path: str, new_base_name: str, file_date: str) -> str:
+        """Renames file safely, handling duplicates, with date at the end."""
         directory = os.path.dirname(original_path)
         ext = os.path.splitext(original_path)[1]
-        new_filename = f"{new_name}{ext}"
+        
+        # New format: Topic_Type_YYYY-MM-DD
+        final_base = f"{new_base_name}_{file_date}"
+        new_filename = f"{final_base}{ext}"
         new_path = os.path.join(directory, new_filename)
 
-        # Collision handling: if file exists, append _1, _2, etc.
+        # Collision handling
         counter = 1
         while os.path.exists(new_path):
-            if new_path == original_path: return original_path # It's already named correctly
-            new_filename = f"{new_name}_{counter}{ext}"
+            if os.path.abspath(new_path) == os.path.abspath(original_path): 
+                return original_path
+            new_filename = f"{final_base}_{counter}{ext}"
             new_path = os.path.join(directory, new_filename)
             counter += 1
             
@@ -103,44 +110,49 @@ class OfflineRAG:
     
     def __init__(self, persist_dir=DB_FOLDER):
         self.persist_dir = persist_dir
-        # Free, offline, high-quality embeddings
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         self.vector_db = None
         self.llm = ChatOllama(model=MODEL_NAME, temperature=0)
 
+    def get_creation_date(self, path):
+        """Gets formatted creation date from file metadata."""
+        try:
+            timestamp = os.path.getctime(path)
+            return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
+        except:
+            return "UnknownDate"
+
     def ingest_and_index(self, folder_path):
-        """Phase 1 & 2: Rename files, then Index them."""
+        """Phase 1 & 2: Rename files (Topic_Type_Date), then Index them."""
         renamer = SemanticRenamer()
         all_docs = []
 
-        logger.info("Starting Batch Processing...")
+        logger.info(f"Starting Batch Processing in: {folder_path}")
         
-        # Collect all file paths FIRST to avoid os.walk confusion during renaming
         target_files = []
         for root, _, files in os.walk(folder_path):
             for file in files:
                 target_files.append(os.path.join(root, file))
 
         for original_path in target_files:
-            # Skip if file was already moved/renamed by another part of the loop
             if not os.path.exists(original_path): continue
             
-            # 1. Read Content
             docs = DocumentIngestor.read_file(original_path)
             if not docs: continue
             
-            # Combine text for analysis
             full_text = " ".join([d.page_content for d in docs])
             
-            # 2. Smart Rename (Only if name doesn't already look like our format)
+            # Use OS creation date
+            c_date = self.get_creation_date(original_path)
+            
+            # Smart Rename (Skip if already follows our pattern to avoid infinite loops)
             base_name = os.path.basename(original_path)
-            if not (base_name.startswith("202") or "UnknownDate" in base_name):
-                suggested_name = renamer.generate_filename(full_text)
-                final_path = renamer.safe_rename(original_path, suggested_name)
+            if "_" not in base_name or len(base_name.split("_")[-1].split(".")[0]) != 10:
+                suggested_topic = renamer.generate_filename(full_text)
+                final_path = renamer.safe_rename(original_path, suggested_topic, c_date)
             else:
                 final_path = original_path
             
-            # 3. Prepare for Indexing
             for d in docs:
                 d.metadata['source'] = final_path
                 d.metadata['filename'] = os.path.basename(final_path)
@@ -150,23 +162,15 @@ class OfflineRAG:
             logger.warning("No documents found to index.")
             return
 
-        # 4. Split and Index
         logger.info(f"Indexing {len(all_docs)} document pages...")
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_documents(all_docs)
         
         try:
-            # Clean up old DB if it's corrupted
-            if os.path.exists(self.persist_dir):
-                import shutil
-                # Only delete if we are doing a fresh index
-                # shutil.rmtree(self.persist_dir) 
-            
             self.vector_db = Chroma.from_documents(
                 documents=chunks,
                 embedding=self.embeddings,
-                persist_directory=self.persist_dir,
-                collection_metadata={"hnsw:space": "cosine"}
+                persist_directory=self.persist_dir
             )
             logger.info("Indexing Complete. Database Saved.")
         except Exception as e:
