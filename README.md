@@ -1,5 +1,7 @@
 # Offline RAG Brain 🧠
 
+C:\Users\Sritej\Desktop\Offline_RAG> .\run_local.bat
+
 An intelligent, fully offline Document Management and Retrieval-Augmented Generation (RAG) system. This tool not only allows you to chat with your local documents but also automatically renames them semantically based on their content using a local LLM.
 
 ## 🚀 Features
