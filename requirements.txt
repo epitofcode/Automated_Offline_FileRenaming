@@ -9,5 +9,6 @@ langchain-text-splitters
 chromadb
 pypdf
 python-docx
+docx2txt
 sentence-transformers
 unidecode

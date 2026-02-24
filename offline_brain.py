@@ -42,6 +42,7 @@ class DocumentIngestor:
             elif ext == ".docx":
                 loader = Docx2txtLoader(file_path)
             elif ext == ".txt" or ext == ".md":
+                # Ensure we handle markdown and text with proper encoding
                 loader = TextLoader(file_path, encoding='utf-8')
             else:
                 return []
