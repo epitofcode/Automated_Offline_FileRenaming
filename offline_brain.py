@@ -168,10 +168,12 @@ class OfflineRAG:
         chunks = splitter.split_documents(all_docs)
         
         try:
+            from chromadb.config import Settings
             self.vector_db = Chroma.from_documents(
                 documents=chunks,
                 embedding=self.embeddings,
-                persist_directory=self.persist_dir
+                persist_directory=self.persist_dir,
+                client_settings=Settings(anonymized_telemetry=False)
             )
             logger.info("Indexing Complete. Database Saved.")
         except Exception as e:
