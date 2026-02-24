@@ -190,7 +190,7 @@ class OfflineRAG:
     def load_db(self):
         """Loads existing DB without re-indexing."""
         if os.path.exists(self.persist_dir):
-            self.vector_db = Chroma(persist_directory=self.persist_dir, embedding=self.embeddings)
+            self.vector_db = Chroma(persist_directory=self.persist_dir, embedding_function=self.embeddings)
             return True
         return False
 
