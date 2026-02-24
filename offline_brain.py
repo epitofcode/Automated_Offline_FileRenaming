@@ -128,6 +128,14 @@ class OfflineRAG:
         renamer = SemanticRenamer()
         all_docs = []
 
+        # CLEAN START: If we are indexing, we want a fresh DB to avoid conflicts
+        if os.path.exists(self.persist_dir):
+            try:
+                shutil.rmtree(self.persist_dir)
+                logger.info("Cleared existing database for fresh indexing.")
+            except Exception as e:
+                logger.warning(f"Could not clear database folder: {e}")
+
         logger.info(f"Starting Batch Processing in: {folder_path}")
         
         target_files = []
