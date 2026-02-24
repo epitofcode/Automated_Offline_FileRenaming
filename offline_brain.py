@@ -115,27 +115,36 @@ class OfflineRAG:
 
         logger.info("Starting Batch Processing...")
         
+        # Collect all file paths FIRST to avoid os.walk confusion during renaming
+        target_files = []
         for root, _, files in os.walk(folder_path):
             for file in files:
-                original_path = os.path.join(root, file)
-                
-                # 1. Read Content
-                docs = DocumentIngestor.read_file(original_path)
-                if not docs: continue
-                
-                # Combine text for analysis
-                full_text = " ".join([d.page_content for d in docs])
-                
-                # 2. Smart Rename (Only if file hasn't been processed/renamed yet)
-                # (In a real pro system, we'd check a database to see if we already did this)
+                target_files.append(os.path.join(root, file))
+
+        for original_path in target_files:
+            # Skip if file was already moved/renamed by another part of the loop
+            if not os.path.exists(original_path): continue
+            
+            # 1. Read Content
+            docs = DocumentIngestor.read_file(original_path)
+            if not docs: continue
+            
+            # Combine text for analysis
+            full_text = " ".join([d.page_content for d in docs])
+            
+            # 2. Smart Rename (Only if name doesn't already look like our format)
+            base_name = os.path.basename(original_path)
+            if not (base_name.startswith("202") or "UnknownDate" in base_name):
                 suggested_name = renamer.generate_filename(full_text)
                 final_path = renamer.safe_rename(original_path, suggested_name)
-                
-                # 3. Prepare for Indexing (Update source metadata to new path)
-                for d in docs:
-                    d.metadata['source'] = final_path
-                    d.metadata['filename'] = os.path.basename(final_path)
-                all_docs.extend(docs)
+            else:
+                final_path = original_path
+            
+            # 3. Prepare for Indexing
+            for d in docs:
+                d.metadata['source'] = final_path
+                d.metadata['filename'] = os.path.basename(final_path)
+            all_docs.extend(docs)
 
         if not all_docs:
             logger.warning("No documents found to index.")
@@ -146,12 +155,22 @@ class OfflineRAG:
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_documents(all_docs)
         
-        self.vector_db = Chroma.from_documents(
-            documents=chunks,
-            embedding=self.embeddings,
-            persist_directory=self.persist_dir
-        )
-        logger.info("Indexing Complete. Database Saved.")
+        try:
+            # Clean up old DB if it's corrupted
+            if os.path.exists(self.persist_dir):
+                import shutil
+                # Only delete if we are doing a fresh index
+                # shutil.rmtree(self.persist_dir) 
+            
+            self.vector_db = Chroma.from_documents(
+                documents=chunks,
+                embedding=self.embeddings,
+                persist_directory=self.persist_dir,
+                collection_metadata={"hnsw:space": "cosine"}
+            )
+            logger.info("Indexing Complete. Database Saved.")
+        except Exception as e:
+            logger.error(f"Vector DB Failure: {e}")
 
     def load_db(self):
         """Loads existing DB without re-indexing."""
