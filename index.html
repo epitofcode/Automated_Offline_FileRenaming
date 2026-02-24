@@ -6,43 +6,79 @@
     <title>Offline RAG Brain</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-white min-h-screen p-8">
-    <div class="max-w-4xl mx-auto">
-        <header class="mb-8 border-b border-slate-700 pb-4">
-            <h1 class="text-3xl font-bold text-blue-400">🧠 Offline RAG Brain</h1>
-            <p class="text-slate-400">Connected to: <span id="connectionStatus" class="text-red-500">Local Backend Offline</span></p>
+<body class="bg-[#050505] text-slate-200 min-h-screen font-sans">
+    <div class="max-w-[1400px] mx-auto p-6 md:p-10">
+        <header class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-6">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tighter text-white">
+                    BENTLEY <span class="text-cyan-500">OFFLINE RAG</span>
+                </h1>
+                <p class="text-slate-500 mt-1 font-medium tracking-wide uppercase text-xs">Automated Semantic Renaming & Neural Indexing</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800">
+                <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-red-500 mr-3 animate-pulse"></div>
+                <span id="connectionStatus" class="text-sm font-semibold tracking-tight text-slate-400">System Offline</span>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- Left: Controls -->
-            <div class="space-y-6">
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                    <h2 class="text-xl font-semibold mb-4 text-blue-300">1. Process Folder</h2>
-                    <input type="text" id="folderPath" placeholder="C:\Users\Name\Documents" 
-                           class="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-4 text-sm">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left: Controls (4 cols) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-[#0f0f0f] p-8 rounded-2xl border border-slate-800 shadow-2xl">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-cyan-500/10 p-2 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                        </div>
+                        <h2 class="text-xl font-bold text-white">Ingestion</h2>
+                    </div>
+                    
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Target Directory</label>
+                    <input type="text" id="folderPath" placeholder="C:\Data\Vessel_Specs" 
+                           class="w-full bg-black border border-slate-800 rounded-xl p-4 mb-6 text-slate-300 focus:outline-none focus:border-cyan-500 transition-all placeholder:text-slate-700">
+                    
                     <button onclick="processFolder()" id="processBtn"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition">
-                        Start Processing
+                            class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-cyan-900/20 active:scale-[0.98]">
+                        INITIALIZE SCAN
                     </button>
                 </div>
 
-                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                    <h2 class="text-xl font-semibold mb-4 text-green-300">2. Chat with Docs</h2>
-                    <textarea id="chatQuery" placeholder="Ask a question..." 
-                              class="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-4 text-sm h-24"></textarea>
+                <div class="bg-[#0f0f0f] p-8 rounded-2xl border border-slate-800 shadow-2xl">
+                    <div class="flex items-center mb-6">
+                        <div class="bg-emerald-500/10 p-2 rounded-lg mr-4">
+                            <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                        </div>
+                        <h2 class="text-xl font-bold text-white">Neural Chat</h2>
+                    </div>
+
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Query Engine</label>
+                    <textarea id="chatQuery" placeholder="What are the stability parameters for project X?" 
+                              class="w-full bg-black border border-slate-800 rounded-xl p-4 mb-6 text-slate-300 focus:outline-none focus:border-emerald-500 transition-all placeholder:text-slate-700 h-32 resize-none"></textarea>
+                    
                     <button onclick="sendChat()" id="chatBtn"
-                            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded transition">
-                        Ask Question
+                            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-[0.98]">
+                        EXECUTE SEARCH
                     </button>
-                    <div id="chatResponse" class="mt-4 text-sm text-slate-300 italic"></div>
+
+                    <div id="chatResponse" class="mt-8 p-4 bg-black/50 rounded-lg border border-slate-800/50 text-sm leading-relaxed text-slate-400 min-h-[100px] hidden">
+                        <!-- Response will appear here -->
+                    </div>
                 </div>
             </div>
 
-            <!-- Right: Live Logs -->
-            <div class="bg-black p-4 rounded-xl border border-slate-700 h-[500px] flex flex-col">
-                <h2 class="text-sm font-mono text-slate-500 mb-2 uppercase tracking-widest">Live System Logs</h2>
-                <div id="logContainer" class="flex-1 overflow-y-auto font-mono text-xs text-green-500 space-y-1 p-2">
-                    <div>> Waiting for connection to localhost:8000...</div>
+            <!-- Right: Terminal (8 cols) -->
+            <div class="lg:col-span-8 flex flex-col h-[800px]">
+                <div class="bg-black rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-full overflow-hidden">
+                    <div class="bg-[#151515] px-6 py-3 border-b border-slate-800 flex justify-between items-center">
+                        <div class="flex space-x-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-500 uppercase tracking-widest">System Monitor | v1.0.4</span>
+                    </div>
+                    <div id="logContainer" class="flex-1 overflow-y-auto font-mono text-xs p-6 space-y-1.5 scrollbar-hide">
+                        <div class="text-slate-600 font-bold mb-4">[SYSTEM INITIALIZED] AWATING CONNECTION TO LOCALHOST:8000...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -52,13 +88,15 @@
         const API_BASE = "http://localhost:8000";
         const WS_BASE = "ws://localhost:8000/ws/logs";
 
-        // Check connection
         async function checkConnection() {
             try {
                 const res = await fetch(`${API_BASE}/docs`);
                 if (res.ok) {
-                    document.getElementById('connectionStatus').innerText = "Local Backend Online";
-                    document.getElementById('connectionStatus').classList.replace('text-red-500', 'text-green-500');
+                    const statusText = document.getElementById('connectionStatus');
+                    const statusDot = document.getElementById('statusDot');
+                    statusText.innerText = "System Operational";
+                    statusText.classList.replace('text-slate-400', 'text-cyan-400');
+                    statusDot.classList.replace('bg-red-500', 'bg-cyan-500');
                     setupWebSocket();
                 }
             } catch (e) {
@@ -71,7 +109,19 @@
             const logs = document.getElementById('logContainer');
             ws.onmessage = (event) => {
                 const div = document.createElement('div');
-                div.textContent = event.data;
+                div.className = "flex items-start border-l-2 border-slate-800 pl-3 py-0.5 hover:bg-white/5 transition-colors";
+                
+                const timestamp = new Date().toLocaleTimeString();
+                const content = event.data;
+                
+                // Color coding based on log content
+                let textColor = "text-slate-400";
+                if(content.includes("INFO")) textColor = "text-blue-400";
+                if(content.includes("WARNING")) textColor = "text-yellow-500";
+                if(content.includes("ERROR")) textColor = "text-red-500";
+                if(content.includes("Renamed")) textColor = "text-emerald-400";
+
+                div.innerHTML = `<span class="text-slate-600 mr-3 shrink-0">${timestamp}</span><span class="${textColor}">${content}</span>`;
                 logs.appendChild(div);
                 logs.scrollTop = logs.scrollHeight;
             };
@@ -80,8 +130,11 @@
         async function processFolder() {
             const path = document.getElementById('folderPath').value;
             const btn = document.getElementById('processBtn');
+            if(!path) return alert("Please specify a directory path.");
+            
             btn.disabled = true;
-            btn.innerText = "Processing...";
+            btn.innerText = "PROCESSING SEQUENCE START...";
+            btn.classList.add('opacity-50');
             
             try {
                 const res = await fetch(`${API_BASE}/api/process`, {
@@ -90,18 +143,24 @@
                     body: JSON.stringify({folder_path: path})
                 });
                 const data = await res.json();
-                alert(data.message);
+                console.log(data.message);
             } catch (e) {
-                alert("Error connecting to local server. Is run_local.bat running?");
+                alert("Connection failed. Check your local terminal.");
             }
             btn.disabled = false;
-            btn.innerText = "Start Processing";
+            btn.innerText = "INITIALIZE SCAN";
+            btn.classList.remove('opacity-50');
         }
 
         async function sendChat() {
             const query = document.getElementById('chatQuery').value;
             const resBox = document.getElementById('chatResponse');
-            resBox.innerText = "Thinking...";
+            const btn = document.getElementById('chatBtn');
+            
+            if(!query) return;
+
+            resBox.classList.remove('hidden');
+            resBox.innerHTML = '<div class="flex items-center"><div class="animate-spin rounded-full h-4 w-4 border-2 border-emerald-500 border-t-transparent mr-3"></div> Neural Engine Computing...</div>';
             
             try {
                 const res = await fetch(`${API_BASE}/api/chat`, {
@@ -110,9 +169,13 @@
                     body: JSON.stringify({query: query})
                 });
                 const data = await res.json();
-                resBox.innerHTML = `<strong>AI:</strong> ${data.answer}<br><br><small>Refs: ${data.references.join(', ')}</small>`;
+                resBox.innerHTML = `<div class="text-emerald-400 font-bold mb-2 uppercase text-[10px] tracking-widest">Output Response</div>
+                                   <div class="text-slate-200">${data.answer}</div>
+                                   <div class="mt-4 pt-4 border-t border-slate-800 text-[10px] text-slate-600">
+                                   SOURCE VERIFICATION: ${data.references.join(' | ')}
+                                   </div>`;
             } catch (e) {
-                resBox.innerText = "Error: Local backend not responding.";
+                resBox.innerHTML = '<span class="text-red-500">Error: Local intelligence unavailable.</span>';
             }
         }
 
