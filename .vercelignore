@@ -1,0 +1,10 @@
+# Ignore the heavy Python backend during Vercel builds
+offline_brain.py
+server.py
+requirements.txt
+Dockerfile
+.venv/
+system.log
+local_chroma_db/
+data/
+run_local.bat
