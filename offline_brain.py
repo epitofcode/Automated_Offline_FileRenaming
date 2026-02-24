@@ -154,12 +154,18 @@ class OfflineRAG:
             # Use OS creation date
             c_date = self.get_creation_date(original_path)
             
-            # Smart Rename (Skip if already follows our pattern to avoid infinite loops)
+            # Smart Rename (Skip if already follows our pattern exactly)
             base_name = os.path.basename(original_path)
-            if "_" not in base_name or len(base_name.split("_")[-1].split(".")[0]) != 10:
+            # Pattern check: Does it have underscores and end with a 10-char date?
+            parts = base_name.split("_")
+            is_already_renamed = len(parts) >= 3 and len(parts[-1].split(".")[0]) == 10
+            
+            if not is_already_renamed:
+                logger.info(f"Analyzing content for renaming: {base_name}")
                 suggested_topic = renamer.generate_filename(full_text)
                 final_path = renamer.safe_rename(original_path, suggested_topic, c_date)
             else:
+                logger.info(f"Skipping rename (already formatted): {base_name}")
                 final_path = original_path
             
             for d in docs:

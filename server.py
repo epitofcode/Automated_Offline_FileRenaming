@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,12 +9,17 @@ from offline_brain import OfflineRAG, logger
 
 app = FastAPI(title="Offline RAG API")
 
+# Global lock to prevent parallel processing
+processing_lock = threading.Lock()
+is_processing = False
+
 # Allow requests from your Vercel frontend and local development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://automated-offline-filerenaming.vercel.app", # Replace with your actual Vercel URL
+        "https://automated-offline-file-renaming.vercel.app",
+        "https://automated-offline-filerenaming.vercel.app",
         "*" 
     ],
     allow_credentials=True,
@@ -23,8 +29,6 @@ app.add_middleware(
 
 # Initialize RAG System globally
 rag_system = OfflineRAG()
-# Attempt to load existing DB on startup
-rag_system.load_db()
 
 class ProcessRequest(BaseModel):
     folder_path: str
@@ -32,15 +36,31 @@ class ProcessRequest(BaseModel):
 class ChatRequest(BaseModel):
     query: str
 
+def run_ingestion(folder_path):
+    global is_processing
+    with processing_lock:
+        is_processing = True
+        try:
+            rag_system.ingest_and_index(folder_path)
+        finally:
+            is_processing = False
+
 @app.post("/api/process")
 async def process_folder(request: ProcessRequest, background_tasks: BackgroundTasks):
     """Endpoint to trigger folder ingestion."""
+    global is_processing
+    if is_processing:
+        raise HTTPException(status_code=400, detail="A processing task is already running. Please wait.")
+        
     if not os.path.exists(request.folder_path) or not os.path.isdir(request.folder_path):
         raise HTTPException(status_code=400, detail="Folder path does not exist on the local machine.")
     
-    # Run in background so the HTTP request doesn't hang the UI
-    background_tasks.add_task(rag_system.ingest_and_index, request.folder_path)
-    return {"message": "Processing started in the background. Check logs.", "status": "processing"}
+    background_tasks.add_task(run_ingestion, request.folder_path)
+    return {"message": "Processing started.", "status": "processing"}
+
+@app.get("/api/status")
+async def get_status():
+    return {"is_processing": is_processing}
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
@@ -50,8 +70,6 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=400, detail="Database not loaded. Please process a folder first.")
     
     answer, docs = rag_system.chat(request.query)
-    
-    # Extract unique references
     references = list(set([d.metadata.get('filename', 'Unknown') for d in docs]))
     return {"answer": answer, "references": references}
 
