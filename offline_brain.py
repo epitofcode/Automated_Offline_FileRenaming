@@ -26,7 +26,7 @@ MODEL_NAME = "llama3"                       # Ensure you ran `ollama pull llama3
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("system.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler("system.log", mode='w'), logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 

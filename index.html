@@ -109,9 +109,8 @@
             const logs = document.getElementById('logContainer');
             ws.onmessage = (event) => {
                 const div = document.createElement('div');
-                div.className = "flex items-start border-l-2 border-slate-800 pl-3 py-0.5 hover:bg-white/5 transition-colors";
+                div.className = "flex items-start border-l-2 border-slate-800 pl-3 py-0.5 hover:bg-white/5 transition-colors font-mono";
                 
-                const timestamp = new Date().toLocaleTimeString();
                 const content = event.data;
                 
                 // Color coding based on log content
@@ -121,7 +120,7 @@
                 if(content.includes("ERROR")) textColor = "text-red-500";
                 if(content.includes("Renamed")) textColor = "text-emerald-400";
 
-                div.innerHTML = `<span class="text-slate-600 mr-3 shrink-0">${timestamp}</span><span class="${textColor}">${content}</span>`;
+                div.innerHTML = `<span class="${textColor}">${content}</span>`;
                 logs.appendChild(div);
                 logs.scrollTop = logs.scrollHeight;
             };

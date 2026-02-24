@@ -62,27 +62,22 @@ async def websocket_logs(websocket: WebSocket):
     log_file = "system.log"
     
     try:
-        # Ensure log file exists before reading
         if not os.path.exists(log_file):
-            open(log_file, 'a').close()
+            with open(log_file, 'w') as f: pass
             
         with open(log_file, 'r', encoding='utf-8') as f:
-            # Read history: Send the last 50 lines first
-            lines = f.readlines()
-            for line in lines[-50:]:
-                await websocket.send_text(line)
-                
-            # Tail the file for new logs
+            # Start at the beginning of the file for the current session
             while True:
                 line = f.readline()
                 if not line:
-                    await asyncio.sleep(0.5) # Wait for new logs
+                    await asyncio.sleep(0.5)
                     continue
-                await websocket.send_text(line)
+                await websocket.send_text(line.strip())
     except WebSocketDisconnect:
-        print("Client disconnected from log stream.")
+        pass
     except Exception as e:
-        await websocket.send_text(f"Error reading logs: {e}")
+        try: await websocket.send_text(f"Log Error: {e}")
+        except: pass
 
 if __name__ == "__main__":
     import uvicorn
