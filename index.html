@@ -15,9 +15,16 @@
                 </h1>
                 <p class="text-slate-500 mt-1 font-medium tracking-wide uppercase text-xs">Automated Semantic Renaming & Neural Indexing</p>
             </div>
-            <div class="mt-4 md:mt-0 flex items-center bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800">
-                <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-red-500 mr-3 animate-pulse"></div>
-                <span id="connectionStatus" class="text-sm font-semibold tracking-tight text-slate-400">System Offline</span>
+            <div class="mt-4 md:mt-0 flex items-center space-x-4">
+                <div class="flex flex-col items-end">
+                    <div class="flex items-center bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800">
+                        <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-red-500 mr-3 animate-pulse"></div>
+                        <span id="connectionStatus" class="text-sm font-semibold tracking-tight text-slate-400">System Offline</span>
+                    </div>
+                    <input type="text" id="serverIp" placeholder="Backend IP (e.g. localhost)" 
+                           class="mt-2 bg-transparent border-b border-slate-800 text-[10px] text-slate-500 focus:outline-none focus:border-cyan-500 text-right"
+                           onchange="updateServerConfig()">
+                </div>
             </div>
         </header>
 
@@ -90,15 +97,23 @@
     </div>
 
     <script>
-        // Use relative paths so it works on localhost and Vercel automatically
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const API_BASE = isLocal ? "" : "http://localhost:8000"; 
-        const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const WS_BASE = isLocal ? `${WS_PROTOCOL}//${window.location.host}/ws/logs` : "ws://localhost:8000/ws/logs";
+        let serverHost = localStorage.getItem('backend_ip') || "localhost:8000";
+        document.getElementById('serverIp').value = serverHost;
+
+        let API_BASE = `http://${serverHost}`;
+        let WS_BASE = `ws://${serverHost}/ws/logs`;
+
+        function updateServerConfig() {
+            const newHost = document.getElementById('serverIp').value.trim();
+            if (newHost) {
+                localStorage.setItem('backend_ip', newHost);
+                location.reload(); // Refresh to apply new connection
+            }
+        }
 
         async function checkConnection() {
             try {
-                const res = await fetch(`${API_BASE}/docs`);
+                const res = await fetch(`${API_BASE}/api/status`);
                 if (res.ok) {
                     const statusText = document.getElementById('connectionStatus');
                     const statusDot = document.getElementById('statusDot');
