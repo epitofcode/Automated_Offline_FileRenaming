@@ -21,9 +21,12 @@
                         <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-red-500 mr-3 animate-pulse"></div>
                         <span id="connectionStatus" class="text-sm font-semibold tracking-tight text-slate-400">System Offline</span>
                     </div>
-                    <input type="text" id="serverIp" placeholder="Backend IP (e.g. localhost)" 
-                           class="mt-2 bg-transparent border-b border-slate-800 text-[10px] text-slate-500 focus:outline-none focus:border-cyan-500 text-right"
-                           onchange="updateServerConfig()">
+                    <div class="flex space-x-2 mt-2">
+                        <a id="bypassLink" href="#" target="_blank" class="text-[9px] text-yellow-500 hover:text-yellow-400 uppercase hidden">Authorize Logs</a>
+                        <input type="text" id="serverIp" placeholder="Backend IP:8000" 
+                               class="bg-transparent border-b border-slate-800 text-[10px] text-slate-500 focus:outline-none focus:border-cyan-500 text-right"
+                               onchange="updateServerConfig()">
+                    </div>
                 </div>
             </div>
         </header>
@@ -112,9 +115,13 @@
         }
 
         async function checkConnection() {
+            const bypassLink = document.getElementById('bypassLink');
+            bypassLink.href = `${API_BASE}/api/status`;
+            
             try {
                 const res = await fetch(`${API_BASE}/api/status`);
                 if (res.ok) {
+                    bypassLink.classList.add('hidden');
                     const statusText = document.getElementById('connectionStatus');
                     const statusDot = document.getElementById('statusDot');
                     statusText.innerText = "System Operational";
@@ -123,6 +130,7 @@
                     setupWebSocket();
                 }
             } catch (e) {
+                bypassLink.classList.remove('hidden');
                 setTimeout(checkConnection, 3000);
             }
         }

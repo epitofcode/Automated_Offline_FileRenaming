@@ -4,10 +4,9 @@ import threading
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi.responses import FileResponse, HTMLResponse
 
 from offline_brain import OfflineRAG, logger
-
-from fastapi.responses import FileResponse, HTMLResponse
 
 app = FastAPI(title="Offline RAG API")
 
@@ -23,12 +22,7 @@ async def get_ui():
 # Allow requests from your Vercel frontend and local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://automated-offline-file-renaming.vercel.app",
-        "https://automated-offline-filerenaming.vercel.app",
-        "*" 
-    ],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +64,15 @@ async def get_status():
     return {"is_processing": is_processing}
 
 @app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """Endpoint for chatting with the documents."""
+    if not rag_system.vector_db:
+        if not rag_system.load_db():
+            raise HTTPException(status_code=400, detail="Database not loaded. Please process a folder first.")
+    
+    answer, docs = rag_system.chat(request.query)
+    references = list(set([d.metadata.get('filename', 'Unknown') for d in docs]))
+    return {"answer": answer, "references": references}
 
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
@@ -78,18 +81,18 @@ async def websocket_logs(websocket: WebSocket):
     log_file = "system.log"
     
     try:
-        # Create if not exists
         if not os.path.exists(log_file):
             with open(log_file, 'w') as f: pass
             
         with open(log_file, 'r', encoding='utf-8') as f:
-            # 1. Send all existing logs for this session first
+            # 1. Send session history
+            f.seek(0)
             existing_content = f.read()
             if existing_content:
                 for line in existing_content.splitlines():
                     await websocket.send_text(line.strip())
             
-            # 2. Tail the file for new additions
+            # 2. Tail for new logs
             while True:
                 line = f.readline()
                 if not line:
@@ -104,5 +107,4 @@ async def websocket_logs(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    # Run the server on port 8000
     uvicorn.run(app, host="0.0.0.0", port=8000)
