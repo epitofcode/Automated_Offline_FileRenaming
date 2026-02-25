@@ -65,39 +65,39 @@ class SemanticRenamer:
         self.llm = ChatOllama(model=model_name, temperature=0)
 
     def generate_filename(self, text_content: str) -> str:
-        """Reads the first 2000 chars and generates a descriptive Topic_Type string."""
+        """Heuristic analysis: Title -> First Para -> Full Page."""
         prompt = (
-            "SYSTEM: You are a strict file-renaming bot. \n"
-            "INSTRUCTION: Analyze the text and provide ONLY a 2-3 word Topic and Type.\n"
+            "You are a Senior Technical Archivist. Your goal is to generate a high-quality Topic_Type filename.\n\n"
+            "STEP-BY-STEP STRATEGY:\n"
+            "1. Identify the starting title/header at the very top of the document.\n"
+            "2. Analyze the first paragraph to see if it provides a more specific subject.\n"
+            "3. If the title is generic (e.g., 'Notes', 'Assignment', 'Report'), combine it with the specific topic from the first paragraph.\n"
+            "4. If neither works, analyze the first 2000 characters to determine the core topic.\n\n"
             "RULES:\n"
-            "1. NO conversation (e.g., do NOT say 'Here is your name' or 'Please provide text').\n"
-            "2. NO full sentences.\n"
-            "3. Format: Topic_Type\n"
-            "4. Example: Calculus_Notes, Marketing_Report, Python_Script.\n"
-            "5. If content is unclear, use: General_Document.\n\n"
-            f"TEXT CONTENT:\n{text_content[:2000]}"
+            "- Output ONLY: Topic_Type\n"
+            "- Example: Python_Concurrency_Notes, Q3_Financial_Report, DeepLearning_Lecture.\n"
+            "- NO conversational filler. NO extensions.\n"
+            "- Max 4 words total.\n\n"
+            f"DOCUMENT CONTENT SNIPPET:\n{text_content[:3000]}"
         )
         try:
             response = self.llm.invoke(prompt)
-            # Clean up the output
-            raw_content = response.content.strip().split("\n")[0] # Take only first line
-            clean_name = unidecode(raw_content).replace(" ", "_").replace("/", "-")
+            raw_content = response.content.strip().split("\n")[0]
+            # Clean up: Remove introductory phrases the LLM might include
+            clean_name = raw_content.replace("Topic_Type:", "").replace("Filename:", "").strip()
+            clean_name = unidecode(clean_name).replace(" ", "_").replace("/", "-")
             
-            # Remove non-alphanumeric except underscores/hyphens
             import re
             clean_name = re.sub(r'[^\w\-]', '', clean_name)
-            
-            # Remove any trailing dates the LLM might have added anyway
             clean_name = re.sub(r'_\d{4}-\d{2}-\d{2}', '', clean_name)
             
-            # CRITICAL: Truncate if LLM ignored rules to prevent OS errors
-            if len(clean_name) > 50:
-                clean_name = clean_name[:47] + "..."
+            if len(clean_name) > 60:
+                clean_name = clean_name[:57] + "..."
                 
-            return clean_name if clean_name else "Processed_Document"
+            return clean_name if clean_name else "Unstructured_Document"
         except Exception as e:
-            logger.error(f"LLM Renaming failed: {e}")
-            return "Unknown_Document"
+            logger.error(f"Heuristic Renaming failed: {e}")
+            return "General_Document"
 
     def safe_rename(self, original_path: str, new_base_name: str, file_date: str) -> str:
         """Renames file safely, handling duplicates, with date at the end."""
