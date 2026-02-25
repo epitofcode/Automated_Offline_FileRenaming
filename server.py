@@ -63,19 +63,6 @@ async def get_status():
     return {"is_processing": is_processing}
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
-    """Endpoint for chatting with the documents."""
-    if not rag_system.vector_db:
-        if not rag_system.load_db():
-            raise HTTPException(status_code=400, detail="Database not loaded. Please process a folder first.")
-    
-    answer, docs = rag_system.chat(request.query)
-    references = list(set([d.metadata.get('filename', 'Unknown') for d in docs]))
-    return {"answer": answer, "references": references}
-
-@app.get("/api/status")
-async def get_status():
-    return {"is_processing": is_processing}
 
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
@@ -84,22 +71,28 @@ async def websocket_logs(websocket: WebSocket):
     log_file = "system.log"
     
     try:
+        # Create if not exists
         if not os.path.exists(log_file):
             with open(log_file, 'w') as f: pass
             
         with open(log_file, 'r', encoding='utf-8') as f:
-            # Seek to start of session
-            f.seek(0)
+            # 1. Send all existing logs for this session first
+            existing_content = f.read()
+            if existing_content:
+                for line in existing_content.splitlines():
+                    await websocket.send_text(line.strip())
+            
+            # 2. Tail the file for new additions
             while True:
                 line = f.readline()
                 if not line:
-                    await asyncio.sleep(0.2) # Faster polling
+                    await asyncio.sleep(0.3) 
                     continue
                 await websocket.send_text(line.strip())
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        try: await websocket.send_text(f"Log Error: {e}")
+        try: await websocket.send_text(f"Terminal Sync Error: {e}")
         except: pass
 
 if __name__ == "__main__":

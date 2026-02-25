@@ -23,7 +23,13 @@ DB_FOLDER = "./local_chroma_db"             # Where the vector DB lives
 MODEL_NAME = "llama3"                       # Ensure you ran `ollama pull llama3`
 
 # --- LOGGING SETUP (Expert Practice) ---
-log_handler = logging.FileHandler("system.log", mode='w')
+class PersistentFlushHandler(logging.FileHandler):
+    """Custom handler that flushes to disk immediately so WebSockets see the data."""
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+log_handler = PersistentFlushHandler("system.log", mode='w')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -61,21 +67,34 @@ class SemanticRenamer:
     def generate_filename(self, text_content: str) -> str:
         """Reads the first 2000 chars and generates a descriptive Topic_Type string."""
         prompt = (
-            "You are a file management assistant. Analyze the text below and generate a concise, "
-            "descriptive topic and document type. "
-            "Format: Topic_Type (e.g., Physics_Notes, Invoice_Service, Project_Proposal). "
-            "Do not include dates. Do not include extensions. "
-            "ONLY output the Topic_Type string.\n\n"
-            f"TEXT: {text_content[:2000]}"
+            "SYSTEM: You are a strict file-renaming bot. \n"
+            "INSTRUCTION: Analyze the text and provide ONLY a 2-3 word Topic and Type.\n"
+            "RULES:\n"
+            "1. NO conversation (e.g., do NOT say 'Here is your name' or 'Please provide text').\n"
+            "2. NO full sentences.\n"
+            "3. Format: Topic_Type\n"
+            "4. Example: Calculus_Notes, Marketing_Report, Python_Script.\n"
+            "5. If content is unclear, use: General_Document.\n\n"
+            f"TEXT CONTENT:\n{text_content[:2000]}"
         )
         try:
             response = self.llm.invoke(prompt)
             # Clean up the output
-            clean_name = unidecode(response.content.strip()).replace(" ", "_").replace("/", "-")
-            # Remove any trailing dates the LLM might have added anyway
+            raw_content = response.content.strip().split("\n")[0] # Take only first line
+            clean_name = unidecode(raw_content).replace(" ", "_").replace("/", "-")
+            
+            # Remove non-alphanumeric except underscores/hyphens
             import re
+            clean_name = re.sub(r'[^\w\-]', '', clean_name)
+            
+            # Remove any trailing dates the LLM might have added anyway
             clean_name = re.sub(r'_\d{4}-\d{2}-\d{2}', '', clean_name)
-            return clean_name
+            
+            # CRITICAL: Truncate if LLM ignored rules to prevent OS errors
+            if len(clean_name) > 50:
+                clean_name = clean_name[:47] + "..."
+                
+            return clean_name if clean_name else "Processed_Document"
         except Exception as e:
             logger.error(f"LLM Renaming failed: {e}")
             return "Unknown_Document"
@@ -161,7 +180,10 @@ class OfflineRAG:
             parts = base_name.split("_")
             is_already_renamed = len(parts) >= 3 and len(parts[-1].split(".")[0]) == 10
             
-            if not is_already_renamed:
+            # Additional check: If the name is ridiculously long or contains conversational keywords, force a re-rename
+            is_bad_name = len(base_name) > 60 or "Please_provide" in base_name or "text_you'd_like" in base_name
+            
+            if not is_already_renamed or is_bad_name:
                 logger.info(f"Analyzing content for renaming: {base_name}")
                 suggested_topic = renamer.generate_filename(full_text)
                 final_path = renamer.safe_rename(original_path, suggested_topic, c_date)
