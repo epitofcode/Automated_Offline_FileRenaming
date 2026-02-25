@@ -65,36 +65,52 @@ class SemanticRenamer:
         self.llm = ChatOllama(model=model_name, temperature=0)
 
     def generate_filename(self, text_content: str) -> str:
-        """Heuristic analysis: Title -> First Para -> Full Page."""
+        """Strict few-shot prompting to force Topic_Type output."""
         prompt = (
-            "You are a Senior Technical Archivist. Your goal is to generate a high-quality Topic_Type filename.\n\n"
-            "STEP-BY-STEP STRATEGY:\n"
-            "1. Identify the starting title/header at the very top of the document.\n"
-            "2. Analyze the first paragraph to see if it provides a more specific subject.\n"
-            "3. If the title is generic (e.g., 'Notes', 'Assignment', 'Report'), combine it with the specific topic from the first paragraph.\n"
-            "4. If neither works, analyze the first 2000 characters to determine the core topic.\n\n"
+            "TASK: Generate a 2-3 word Topic_Type filename from the text.\n"
             "RULES:\n"
-            "- Output ONLY: Topic_Type\n"
-            "- Example: Python_Concurrency_Notes, Q3_Financial_Report, DeepLearning_Lecture.\n"
-            "- NO conversational filler. NO extensions.\n"
-            "- Max 4 words total.\n\n"
-            f"DOCUMENT CONTENT SNIPPET:\n{text_content[:3000]}"
+            "1. Output ONLY words and underscores (e.g. Topic_Type).\n"
+            "2. NO sentences. NO 'Based on'. NO 'Here is'.\n"
+            "3. NO conversational filler.\n\n"
+            "EXAMPLES:\n"
+            "Text: 'Calculus 101 Lecture notes on derivatives...' -> Calculus_Notes\n"
+            "Text: 'Project Alpha Final Report for Q3 2023...' -> ProjectAlpha_Report\n"
+            "Text: 'Official meeting minutes from Jan 5th...' -> Meeting_Minutes\n\n"
+            f"TEXT TO ANALYZE:\n{text_content[:2500]}\n\n"
+            "FINAL FILENAME (Topic_Type):"
         )
         try:
             response = self.llm.invoke(prompt)
-            raw_content = response.content.strip().split("\n")[0]
-            # Clean up: Remove introductory phrases the LLM might include
-            clean_name = raw_content.replace("Topic_Type:", "").replace("Filename:", "").strip()
-            clean_name = unidecode(clean_name).replace(" ", "_").replace("/", "-")
+            # Remove ALL conversational fluff (even if it's the first line)
+            lines = response.content.strip().split("\n")
+            # Look for the line that actually looks like a filename (contains underscore, no spaces)
+            result = ""
+            for line in lines:
+                candidate = line.replace("Topic_Type:", "").replace("Result:", "").strip()
+                if "_" in candidate and " " not in candidate:
+                    result = candidate
+                    break
+            
+            if not result:
+                result = lines[-1].strip() # Fallback to last line
+
+            # Clean up: Remove introductory phrases
+            bad_phrases = ["based_on", "here_is", "the_document", "i_will_generate", "i_would_generate", "lets_apply"]
+            clean_name = unidecode(result).replace(" ", "_").replace("/", "-")
             
             import re
+            # If the LLM still gave a sentence, take only the last few words or words with underscores
+            if len(clean_name) > 40:
+                parts = [p for p in clean_name.split("_") if p.lower() not in bad_phrases]
+                clean_name = "_".join(parts[-3:]) # Take last 3 relevant words
+
             clean_name = re.sub(r'[^\w\-]', '', clean_name)
             clean_name = re.sub(r'_\d{4}-\d{2}-\d{2}', '', clean_name)
             
-            if len(clean_name) > 60:
-                clean_name = clean_name[:57] + "..."
+            if len(clean_name) > 50:
+                clean_name = clean_name[:47] + "..."
                 
-            return clean_name if clean_name else "Unstructured_Document"
+            return clean_name if clean_name else "Processed_Doc"
         except Exception as e:
             logger.error(f"Heuristic Renaming failed: {e}")
             return "General_Document"

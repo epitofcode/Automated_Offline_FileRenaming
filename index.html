@@ -77,6 +77,18 @@
 
             <!-- Right: Terminal (8 cols) -->
             <div class="lg:col-span-8 flex flex-col h-[800px]">
+                <!-- Log Security Alert -->
+                <div id="logAlert" class="mb-4 bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl hidden">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-yellow-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <div>
+                            <h3 class="text-sm font-bold text-yellow-500 uppercase tracking-widest">Logs Blocked by Browser Security</h3>
+                            <p class="text-xs text-slate-400 mt-1">Vercel (HTTPS) cannot stream logs from a local backend (HTTP). To see live renaming logs, please open the dashboard at: <br>
+                            <a id="localLink" href="#" class="text-cyan-400 font-bold hover:underline mt-1 inline-block"></a></p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-black rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-full overflow-hidden">
                     <div class="bg-[#151515] px-6 py-3 border-b border-slate-800 flex justify-between items-center">
                         <div class="flex items-center space-x-4">
@@ -116,8 +128,18 @@
 
         async function checkConnection() {
             const bypassLink = document.getElementById('bypassLink');
+            const logAlert = document.getElementById('logAlert');
+            const localLink = document.getElementById('localLink');
+            
             bypassLink.href = `${API_BASE}/api/status`;
             
+            // Show alert if on Vercel
+            if (!isLocal) {
+                logAlert.classList.remove('hidden');
+                localLink.href = `http://${serverHost}`;
+                localLink.innerText = `http://${serverHost}`;
+            }
+
             try {
                 const res = await fetch(`${API_BASE}/api/status`);
                 if (res.ok) {
