@@ -90,8 +90,11 @@
     </div>
 
     <script>
-        const API_BASE = "http://localhost:8000";
-        const WS_BASE = "ws://localhost:8000/ws/logs";
+        // Use relative paths so it works on localhost and Vercel automatically
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_BASE = isLocal ? "" : "http://localhost:8000"; 
+        const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const WS_BASE = isLocal ? `${WS_PROTOCOL}//${window.location.host}/ws/logs` : "ws://localhost:8000/ws/logs";
 
         async function checkConnection() {
             try {

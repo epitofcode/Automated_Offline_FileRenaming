@@ -7,11 +7,18 @@ from pydantic import BaseModel
 
 from offline_brain import OfflineRAG, logger
 
+from fastapi.responses import FileResponse, HTMLResponse
+
 app = FastAPI(title="Offline RAG API")
 
 # Global lock to prevent parallel processing
 processing_lock = threading.Lock()
 is_processing = False
+
+# Root route to serve the UI directly
+@app.get("/", response_class=HTMLResponse)
+async def get_ui():
+    return FileResponse("index.html")
 
 # Allow requests from your Vercel frontend and local development
 app.add_middleware(

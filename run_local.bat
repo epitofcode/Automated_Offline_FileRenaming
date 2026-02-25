@@ -29,7 +29,8 @@ call .venv\Scripts\activate
 pip install -r requirements.txt
 
 echo [INFO] Starting Backend Server on http://localhost:8000
-echo [INFO] You can now open your UI in the browser.
+echo [INFO] >>> OPEN THIS LINK IN YOUR BROWSER: http://localhost:8000
+echo [INFO] (The local link is better for viewing live logs)
 python server.py
 
 pause
