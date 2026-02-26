@@ -24,7 +24,7 @@
                     <div class="flex space-x-2 mt-2">
                         <a id="bypassLink" href="#" target="_blank" class="text-[9px] text-yellow-500 hover:text-yellow-400 uppercase hidden">Authorize Logs</a>
                         <input type="text" id="serverIp" placeholder="Backend IP:8000" 
-                               class="bg-transparent border-b border-slate-800 text-[10px] text-slate-500 focus:outline-none focus:border-cyan-500 text-right"
+                               class="bg-transparent border-b border-slate-800 text-[10px] text-slate-500 focus:outline-none focus:border-cyan-500 text-right w-32"
                                onchange="updateServerConfig()">
                     </div>
                 </div>
@@ -83,8 +83,10 @@
                         <svg class="w-5 h-5 text-yellow-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                         <div>
                             <h3 class="text-sm font-bold text-yellow-500 uppercase tracking-widest">Logs Blocked by Browser Security</h3>
-                            <p class="text-xs text-slate-400 mt-1">Vercel (HTTPS) cannot stream logs from a local backend (HTTP). To see live renaming logs, please open the dashboard at: <br>
-                            <a id="localLink" href="#" class="text-cyan-400 font-bold hover:underline mt-1 inline-block"></a></p>
+                            <p class="text-xs text-slate-400 mt-1">Vercel (HTTPS) cannot stream logs from a local backend (HTTP). To fix:<br>
+                            1. Click <a id="localLink" href="#" target="_blank" class="text-cyan-400 font-bold hover:underline">THIS LINK</a><br>
+                            2. Click "Advanced" -> "Proceed" if warned.<br>
+                            3. Refresh this page.</p>
                         </div>
                     </div>
                 </div>
@@ -104,7 +106,7 @@
                         </button>
                     </div>
                     <div id="logContainer" class="flex-1 overflow-y-auto font-mono text-xs p-6 space-y-1.5 scrollbar-hide">
-                        <div class="text-slate-600 font-bold mb-4">[SYSTEM INITIALIZED] AWATING CONNECTION TO LOCALHOST:8000...</div>
+                        <div class="text-slate-600 font-bold mb-4">[SYSTEM INITIALIZED] AWATING CONNECTION...</div>
                     </div>
                 </div>
             </div>
@@ -112,59 +114,72 @@
     </div>
 
     <script>
-        let serverHost = localStorage.getItem('backend_ip') || "localhost:8000";
-        document.getElementById('serverIp').value = serverHost;
+        // State management
+        const isVercel = window.location.hostname.includes('vercel.app');
+        let serverHost = localStorage.getItem('backend_ip') || (isVercel ? "localhost:8000" : window.location.host);
+        
+        // UI Elements
+        const serverIpInput = document.getElementById('serverIp');
+        const bypassLink = document.getElementById('bypassLink');
+        const logAlert = document.getElementById('logAlert');
+        const localLink = document.getElementById('localLink');
+        const statusText = document.getElementById('connectionStatus');
+        const statusDot = document.getElementById('statusDot');
+        const logContainer = document.getElementById('logContainer');
 
-        let API_BASE = `http://${serverHost}`;
-        let WS_BASE = `ws://${serverHost}/ws/logs`;
+        serverIpInput.value = serverHost;
+
+        let API_BASE = serverHost.startsWith('http') ? serverHost : `http://${serverHost}`;
+        let WS_BASE = serverHost.startsWith('http') 
+            ? serverHost.replace('http', 'ws') + '/ws/logs' 
+            : `ws://${serverHost}/ws/logs`;
 
         function updateServerConfig() {
-            const newHost = document.getElementById('serverIp').value.trim();
+            const newHost = serverIpInput.value.trim();
             if (newHost) {
                 localStorage.setItem('backend_ip', newHost);
-                location.reload(); // Refresh to apply new connection
+                location.reload();
             }
         }
 
         async function checkConnection() {
-            const bypassLink = document.getElementById('bypassLink');
-            const logAlert = document.getElementById('logAlert');
-            const localLink = document.getElementById('localLink');
+            // Update bypass links
+            const testUrl = `${API_BASE}/api/status`;
+            bypassLink.href = testUrl;
+            localLink.href = testUrl;
             
-            // Show alert if on Vercel
-            if (!isLocal) {
+            if (isVercel) {
                 logAlert.classList.remove('hidden');
-                localLink.href = `http://${serverHost}`;
-                localLink.innerText = `http://${serverHost}`;
             }
 
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
                 
-                const res = await fetch(`${API_BASE}/api/status`, { signal: controller.signal });
+                const res = await fetch(testUrl, { 
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: controller.signal 
+                });
                 clearTimeout(timeoutId);
 
                 if (res.ok) {
                     bypassLink.classList.add('hidden');
                     logAlert.classList.add('hidden');
-                    const statusText = document.getElementById('connectionStatus');
-                    const statusDot = document.getElementById('statusDot');
                     statusText.innerText = "System Operational";
-                    statusText.classList.replace('text-slate-400', 'text-cyan-400');
-                    statusDot.classList.replace('bg-red-500', 'bg-cyan-500');
+                    statusText.className = "text-sm font-semibold tracking-tight text-cyan-400";
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-cyan-500 mr-3 animate-pulse";
                     
-                    // Only start WebSocket if not already active
                     if (!window.logSocket || window.logSocket.readyState !== WebSocket.OPEN) {
                         setupWebSocket();
                     }
                 }
             } catch (e) {
-                console.warn("Backend unreachable or blocked:", e);
-                const statusText = document.getElementById('connectionStatus');
-                statusText.innerText = "Connection Blocked";
+                console.error("Connection blocked or server down:", e);
+                statusText.innerText = "Backend Unreachable";
+                statusText.className = "text-sm font-semibold tracking-tight text-red-400";
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-red-500 mr-3";
                 bypassLink.classList.remove('hidden');
-                bypassLink.href = `${API_BASE}/api/status`;
                 setTimeout(checkConnection, 5000);
             }
         }
@@ -172,40 +187,43 @@
         function setupWebSocket() {
             if (window.logSocket) window.logSocket.close();
             
-            const ws = new WebSocket(WS_BASE);
-            window.logSocket = ws;
-            
-            const logs = document.getElementById('logContainer');
-            
-            ws.onopen = () => {
-                const div = document.createElement('div');
-                div.className = "text-cyan-500 font-bold";
-                div.textContent = "[CONNECTED TO LOG STREAM]";
-                logs.appendChild(div);
-            };
-
-            ws.onmessage = (event) => {
-                const div = document.createElement('div');
-                div.className = "flex items-start border-l-2 border-slate-800 pl-3 py-0.5 hover:bg-white/5 transition-colors font-mono";
+            try {
+                const ws = new WebSocket(WS_BASE);
+                window.logSocket = ws;
                 
-                const content = event.data;
-                
-                // Color coding based on log content
-                let textColor = "text-slate-400";
-                if(content.includes("INFO")) textColor = "text-blue-400";
-                if(content.includes("WARNING")) textColor = "text-yellow-500";
-                if(content.includes("ERROR")) textColor = "text-red-500";
-                if(content.includes("Renamed")) textColor = "text-emerald-400";
+                ws.onopen = () => {
+                    const div = document.createElement('div');
+                    div.className = "text-cyan-500 font-bold border-b border-cyan-900/30 pb-2 mb-2";
+                    div.textContent = ">>> [SYSTEM LINK ESTABLISHED] STREAMING LIVE DATA";
+                    logContainer.appendChild(div);
+                };
 
-                div.innerHTML = `<span class="${textColor}">${content}</span>`;
-                logs.appendChild(div);
-                logs.scrollTop = logs.scrollHeight;
-            };
+                ws.onmessage = (event) => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-start border-l-2 border-slate-800 pl-3 py-0.5 hover:bg-white/5 transition-colors font-mono";
+                    const content = event.data;
+                    
+                    let textColor = "text-slate-400";
+                    if(content.includes("INFO")) textColor = "text-blue-400";
+                    if(content.includes("WARNING")) textColor = "text-yellow-500";
+                    if(content.includes("ERROR")) textColor = "text-red-500";
+                    if(content.includes("Renamed")) textColor = "text-emerald-400";
+
+                    div.innerHTML = `<span class="${textColor}">${content}</span>`;
+                    logContainer.appendChild(div);
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                };
+
+                ws.onerror = (e) => {
+                    console.error("WebSocket Error:", e);
+                };
+            } catch (err) {
+                console.error("WebSocket Setup failed:", err);
+            }
         }
 
         function clearLogs() {
-            const logs = document.getElementById('logContainer');
-            logs.innerHTML = '<div class="text-slate-600 font-bold mb-4">[SYSTEM CLEARED] MONITORING LIVE DATA...</div>';
+            logContainer.innerHTML = '<div class="text-slate-600 font-bold mb-4">[SYSTEM CLEARED] MONITORING LIVE DATA...</div>';
         }
 
         async function processFolder() {
@@ -236,7 +254,6 @@
         async function sendChat() {
             const query = document.getElementById('chatQuery').value;
             const resBox = document.getElementById('chatResponse');
-            const btn = document.getElementById('chatBtn');
             
             if(!query) return;
 

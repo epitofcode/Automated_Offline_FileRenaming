@@ -85,14 +85,12 @@ async def websocket_logs(websocket: WebSocket):
             with open(log_file, 'w') as f: pass
             
         with open(log_file, 'r', encoding='utf-8') as f:
-            # 1. Send session history
             f.seek(0)
             existing_content = f.read()
             if existing_content:
                 for line in existing_content.splitlines():
                     await websocket.send_text(line.strip())
             
-            # 2. Tail for new logs
             while True:
                 line = f.readline()
                 if not line:
