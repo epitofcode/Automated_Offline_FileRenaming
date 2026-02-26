@@ -65,50 +65,46 @@ class SemanticRenamer:
         self.llm = ChatOllama(model=model_name, temperature=0)
 
     def generate_filename(self, text_content: str) -> str:
-        """Strict few-shot prompting to force Topic_Type output."""
+        """Strict few-shot prompting and aggressive post-processing to force Topic_Type output."""
         prompt = (
-            "TASK: Generate a 2-3 word Topic_Type filename from the text.\n"
-            "RULES:\n"
-            "1. Output ONLY words and underscores (e.g. Topic_Type).\n"
-            "2. NO sentences. NO 'Based on'. NO 'Here is'.\n"
-            "3. NO conversational filler.\n\n"
+            "You are a strict file-naming script. Your ONLY output must be a 2 to 3 word string describing the text, formatted as Topic_Type.\n"
+            "DO NOT write sentences. DO NOT write explanations. ONLY output the Topic_Type string.\n\n"
             "EXAMPLES:\n"
-            "Text: 'Calculus 101 Lecture notes on derivatives...' -> Calculus_Notes\n"
-            "Text: 'Project Alpha Final Report for Q3 2023...' -> ProjectAlpha_Report\n"
-            "Text: 'Official meeting minutes from Jan 5th...' -> Meeting_Minutes\n\n"
-            f"TEXT TO ANALYZE:\n{text_content[:2500]}\n\n"
-            "FINAL FILENAME (Topic_Type):"
+            "Input: 'Calculus 101 Lecture notes on derivatives...' -> Calculus_Notes\n"
+            "Input: 'Project Alpha Final Report for Q3 2023...' -> ProjectAlpha_Report\n"
+            "Input: 'Official meeting minutes from Jan 5th...' -> Meeting_Minutes\n\n"
+            f"INPUT TEXT:\n{text_content[:2500]}\n\n"
+            "OUTPUT STRING:"
         )
         try:
-            response = self.llm.invoke(prompt)
-            # Remove ALL conversational fluff (even if it's the first line)
-            lines = response.content.strip().split("\n")
-            # Look for the line that actually looks like a filename (contains underscore, no spaces)
-            result = ""
-            for line in lines:
-                candidate = line.replace("Topic_Type:", "").replace("Result:", "").strip()
-                if "_" in candidate and " " not in candidate:
-                    result = candidate
-                    break
-            
-            if not result:
-                result = lines[-1].strip() # Fallback to last line
-
-            # Clean up: Remove introductory phrases
-            bad_phrases = ["based_on", "here_is", "the_document", "i_will_generate", "i_would_generate", "lets_apply"]
-            clean_name = unidecode(result).replace(" ", "_").replace("/", "-")
-            
             import re
-            # If the LLM still gave a sentence, take only the last few words or words with underscores
-            if len(clean_name) > 40:
-                parts = [p for p in clean_name.split("_") if p.lower() not in bad_phrases]
-                clean_name = "_".join(parts[-3:]) # Take last 3 relevant words
-
+            response = self.llm.invoke(prompt)
+            raw_text = response.content.strip()
+            
+            # 1. Strip common AI prefixes
+            raw_text = re.sub(r'^(here is|based on|the document|i will|i would|let\'s|output:|topic_type:)[^a-zA-Z0-9]*', '', raw_text, flags=re.IGNORECASE)
+            
+            # 2. Take only the first line if it generated multiple
+            raw_text = raw_text.split('\n')[0].strip()
+            
+            # 3. Replace spaces and slashes with underscores
+            clean_name = unidecode(raw_text).replace(" ", "_").replace("/", "-")
+            
+            # 4. Remove all characters except alphanumeric, underscores, and hyphens
             clean_name = re.sub(r'[^\w\-]', '', clean_name)
+            
+            # 5. Remove any hallucinated dates
             clean_name = re.sub(r'_\d{4}-\d{2}-\d{2}', '', clean_name)
             
-            if len(clean_name) > 50:
-                clean_name = clean_name[:47] + "..."
+            # 6. Aggressive Sentence Guard: If it has more than 4 words (underscores), it's probably a sentence. Take the first 3 meaningful words.
+            parts = [p for p in clean_name.split("_") if p]
+            if len(parts) > 4:
+                # Filter out stop words if possible, but taking the first 3 is safest
+                clean_name = "_".join(parts[:3])
+            
+            # 7. Final length cap
+            if len(clean_name) > 40:
+                clean_name = clean_name[:37].strip("_")
                 
             return clean_name if clean_name else "Processed_Doc"
         except Exception as e:
