@@ -131,8 +131,6 @@
             const logAlert = document.getElementById('logAlert');
             const localLink = document.getElementById('localLink');
             
-            bypassLink.href = `${API_BASE}/api/status`;
-            
             // Show alert if on Vercel
             if (!isLocal) {
                 logAlert.classList.remove('hidden');
@@ -141,25 +139,51 @@
             }
 
             try {
-                const res = await fetch(`${API_BASE}/api/status`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                
+                const res = await fetch(`${API_BASE}/api/status`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (res.ok) {
                     bypassLink.classList.add('hidden');
+                    logAlert.classList.add('hidden');
                     const statusText = document.getElementById('connectionStatus');
                     const statusDot = document.getElementById('statusDot');
                     statusText.innerText = "System Operational";
                     statusText.classList.replace('text-slate-400', 'text-cyan-400');
                     statusDot.classList.replace('bg-red-500', 'bg-cyan-500');
-                    setupWebSocket();
+                    
+                    // Only start WebSocket if not already active
+                    if (!window.logSocket || window.logSocket.readyState !== WebSocket.OPEN) {
+                        setupWebSocket();
+                    }
                 }
             } catch (e) {
+                console.warn("Backend unreachable or blocked:", e);
+                const statusText = document.getElementById('connectionStatus');
+                statusText.innerText = "Connection Blocked";
                 bypassLink.classList.remove('hidden');
-                setTimeout(checkConnection, 3000);
+                bypassLink.href = `${API_BASE}/api/status`;
+                setTimeout(checkConnection, 5000);
             }
         }
 
         function setupWebSocket() {
+            if (window.logSocket) window.logSocket.close();
+            
             const ws = new WebSocket(WS_BASE);
+            window.logSocket = ws;
+            
             const logs = document.getElementById('logContainer');
+            
+            ws.onopen = () => {
+                const div = document.createElement('div');
+                div.className = "text-cyan-500 font-bold";
+                div.textContent = "[CONNECTED TO LOG STREAM]";
+                logs.appendChild(div);
+            };
+
             ws.onmessage = (event) => {
                 const div = document.createElement('div');
                 div.className = "flex items-start border-l-2 border-slate-800 pl-3 py-0.5 hover:bg-white/5 transition-colors font-mono";
